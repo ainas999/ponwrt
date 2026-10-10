@@ -7,7 +7,7 @@ on:
         description: '是否开启 SSH 连入 (SSH to Actions 手动配置 Target/Profile)'
         required: false
         type: boolean
-        default: true
+        default: false
 
 env:
   REPO_URL: https://github.com/pbs05/ponwrt
