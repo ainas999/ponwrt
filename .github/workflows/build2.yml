@@ -1,0 +1,94 @@
+name: 编译 PonWrt 固件
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      target_board:
+        description: '选择目标机型'
+        required: true
+        default: 'an7581'
+        type: choice
+        options:
+          - an7581
+          - an7583
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360  # 最大6小时超时限制
+    steps:
+      - name: 检出 PonWrt 源码
+        uses: actions/checkout@v4
+
+      - name: 配置 ccache 编译缓存
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ponwrt-ccache-${{ github.ref }}-${{ github.event.inputs.target_board }}
+          restore-keys: |
+            ponwrt-ccache-${{ github.ref }}-
+            ponwrt-ccache-
+
+      - name: 安装编译依赖包
+        run: |
+          sudo apt update -y
+          sudo apt full-upgrade -y
+          sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+            bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib \
+            g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev \
+            libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev \
+            libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
+            ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
+            python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
+            upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
+          # 配置ccache
+          ccache --set-config cache_dir=~/.ccache
+          ccache --set-config max_size=10G
+          ccache -z
+
+      - name: 更新并安装 feeds 软件源
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: 加载机型配置文件
+        run: |
+          if [[ "${{ github.event.inputs.target_board }}" == "an7581" ]]; then
+            cp configs/an7581.config .config
+          else
+            cp configs/an7583.config .config
+          fi
+
+      - name: 开始编译固件
+        run: |
+          make defconfig
+          make -j$(nproc)
+          ccache -s
+
+      - name: 上传编译产物（网页直接下载）
+        uses: actions/upload-artifact@v4
+        with:
+          name: PonWrt-${{ github.event.inputs.target_board }}
+          path: bin/targets/
+
+      - name: 打包固件用于Release发布
+        run: |
+          cd bin/targets
+          zip -r PonWrt-${{ github.event.inputs.target_board }}.zip .
+          mv PonWrt-${{ github.event.inputs.target_board }}.zip $GITHUB_WORKSPACE/
+
+      - name: 创建Release并上传固件
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: PonWrt-${{ github.event.inputs.target_board }}-${{ github.sha }}
+          name: PonWrt ${{ github.event.inputs.target_board }} 编译构建 ${{ github.sha }}
+          body: |
+            PonWrt 自动编译固件
+            机型：${{ github.event.inputs.target_board }}
+            编译commit: ${{ github.sha }}
+            编译时间: ${{ github.date }}
+          files: PonWrt-${{ github.event.inputs.target_board }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
