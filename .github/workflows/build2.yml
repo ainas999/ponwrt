@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 360  # 最大6小时超时限制
     steps:
-      - name: 检出 PonWrt 源码
+      - name: 检查代码仓库
         uses: actions/checkout@v4
 
       - name: 配置 ccache 编译缓存
