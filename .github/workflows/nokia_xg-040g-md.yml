@@ -10,9 +10,19 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 360  # 最大6小时超时限制
     steps:
-      - name: 检查源代码
+      - name: 检查代码仓库
         uses: actions/checkout@v4
+
+      - name: 配置 ccache 编译缓存
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ponwrt-ccache-${{ github.ref }}-${{ github.event.inputs.target_board }}
+          restore-keys: |
+            ponwrt-ccache-${{ github.ref }}-
+            ponwrt-ccache-
 
       - name: 安装编译依赖
         run: |
