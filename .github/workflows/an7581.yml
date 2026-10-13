@@ -1,4 +1,4 @@
-name: 发布 PonWrt 固件
+name: 发布 PonWrt an7581 固件
 
 on:
   workflow_dispatch:
